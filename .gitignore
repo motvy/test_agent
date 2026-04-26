@@ -1,0 +1,59 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Virtual env
+.venv/
+venv/
+
+# Env variables
+.env
+.env.*
+*.env
+!.env.example
+
+# Logs
+logs/
+*.log
+*.out
+*.err
+
+# PyCharm
+.idea/
+
+# VSCode
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Build
+dist/
+build/
+*.egg-info/
+pip-wheel-metadata/
+
+# Temporary files
+*.tmp
+*.bak
+
+# Databases / cache
+*.db
+*.sqlite3
+.cache/
+
+# Docker
+docker-compose.override.yml
+*.pid
+
+# Python local packages
+__pypackages__/
