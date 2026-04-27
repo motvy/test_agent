@@ -15,7 +15,14 @@ class TextStatsTool(BaseTool):
         words = len(text.split())
         lines = len(lines)
         
-        return ToolResult(content=f"characters={chars}, words={words}, lines={lines}", display=f"Символы: {chars}, слова: {words}, строки: {lines}")
+        return ToolResult(
+            content=(
+                f"Результат выполнения tool {self.name}: "
+                f"characters={chars}, words={words}, lines={lines}.\n"
+                "Используй это значение для ответа."
+            ), 
+            display=f"Символы: {chars}, слова: {words}, строки: {lines}"
+        )
 
     def openai_schema(self) -> dict[str, Any]:
         return {

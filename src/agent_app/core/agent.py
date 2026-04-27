@@ -122,8 +122,8 @@ class Agent:
         for tool_call in response.tool_calls:
             try:
                 tool_result = self.tools.run(name=tool_call.name, arguments=tool_call.arguments)
-
                 tool_content = tool_result.content
+                tool_display = tool_result.display
 
                 await self._add_step(
                     steps=steps,
@@ -141,6 +141,7 @@ class Agent:
             except ToolNotFoundError as error:
                 has_tool_error = True
                 tool_content = error.user_message()
+                tool_display = None
 
                 await self._add_step(
                     steps=steps,
@@ -154,7 +155,14 @@ class Agent:
                     on_step=on_step,
                 )
 
-            messages.append(Message(role="tool", name=tool_call.name, tool_call_id=tool_call.id, content=tool_content, meta={"display": tool_result.display}))
+            messages.append(
+                Message(
+                    role="tool",
+                    name=tool_call.name,
+                    tool_call_id=tool_call.id,
+                    content=tool_content,
+                    meta={"display": tool_display})
+                )
 
         response = await self._call_llm(messages=messages, steps=steps, on_step=on_step, use_tools=has_tool_error)
 

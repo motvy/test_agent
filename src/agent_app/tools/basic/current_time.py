@@ -11,7 +11,13 @@ class CurrentTimeTool(BaseTool):
     def run(self, arguments: dict) -> ToolResult:
         now = datetime.now().isoformat()
 
-        return ToolResult(content=now, display=f"Текущее время: {now}")
+        return ToolResult(
+            content=(
+                f"Результат выполнения tool {self.name}: {now}.\n"
+                "Используй это значение для ответа."
+            ), 
+            display=f"Текущее время: {now}"
+        )
 
     def openai_schema(self) -> dict[str, Any]:
         return {
