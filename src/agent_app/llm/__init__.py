@@ -6,6 +6,7 @@ from .exceptions import (
     LLMResponseError,
     LLMTimeoutError,
     LLMCancelledError,
+    ToolNotFoundError,
 )
 from .openai_compatible import OpenAICompatibleClient
 
@@ -18,4 +19,5 @@ __all__ = [
     "LLMConnectionError",
     "LLMResponseError",
     "LLMConfigurationError",
+    "ToolNotFoundError",
 ]

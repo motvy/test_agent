@@ -1,4 +1,5 @@
 from agent_app.tools.base import BaseTool, ToolResult
+from agent_app.llm import ToolNotFoundError
 
 
 class ToolRegistry:
@@ -9,7 +10,13 @@ class ToolRegistry:
         self._tools[tool.name] = tool
 
     def get(self, name: str) -> BaseTool:
-        return self._tools[name]
+        try:
+            return self._tools[name]
+        except KeyError as error:
+            available = ", ".join(self._tools.keys())
+            raise ToolNotFoundError(
+                f"Неизвестный tool: {name}. Доступные tools: {available}"
+            ) from error
 
     def has(self, name: str) -> bool:
         return name in self._tools

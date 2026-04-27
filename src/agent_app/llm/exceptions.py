@@ -36,3 +36,16 @@ class LLMConfigurationError(LLMError):
 class LLMCancelledError(LLMError):
     """LLM request cancelled."""
     message = "Запрос был отменён."
+
+class ToolNotFoundError(LLMError):
+    """LLM requested a non-existent tool"""
+
+    message = "LLM запросила несуществующий tool"
+
+    def __init__(self, tool_name: str, available_tools: list[str]):
+        self.tool_name = tool_name
+        self.available_tools = available_tools
+
+        super().__init__(
+            f"Unknown tool: {tool_name}. Available tools: {', '.join(available_tools)}"
+        )

@@ -5,7 +5,7 @@ from loguru import logger
 
 from agent_app.core.messages import Message
 from agent_app.core.steps import AgentResult, Step
-from agent_app.llm import BaseLLMClient, LLMResponse, LLMError
+from agent_app.llm import BaseLLMClient, LLMResponse, LLMError, ToolNotFoundError
 from agent_app.memory import BaseMemory
 from agent_app.tools import ToolRegistry
 
@@ -116,30 +116,51 @@ class Agent:
         )
 
         messages.append(Message(role="assistant", content=response.content, tool_calls=response.tool_calls))
+
+        has_tool_error = False
+
         for tool_call in response.tool_calls:
-            logger.info("Executing tool: name={}, arguments={}", tool_call.name, tool_call.arguments)
-            tool_result = self.tools.run(name=tool_call.name, arguments=tool_call.arguments)
-            logger.debug("Tool result: name={}, result={}", tool_call.name, tool_result.content)
+            try:
+                tool_result = self.tools.run(name=tool_call.name, arguments=tool_call.arguments)
 
-            await self._add_step(
-                steps=steps,
-                name="tool_executed",
-                message=f"Выполнен tool: {tool_call.name}",
-                meta={
-                    "tool_call_id": tool_call.id,
-                    "tool_name": tool_call.name,
-                    "arguments": tool_call.arguments,
-                    "result": tool_result.content,
-                },
-                on_step=on_step,
-            )
+                tool_content = tool_result.content
 
-            messages.append(Message(role="tool", name=tool_call.name, tool_call_id=tool_call.id, content=tool_result.content, meta={"display": tool_result.display}))
+                await self._add_step(
+                    steps=steps,
+                    name="tool_executed",
+                    message=f"Выполнен tool: {tool_call.name}",
+                    meta={
+                        "tool_call_id": tool_call.id,
+                        "tool_name": tool_call.name,
+                        "arguments": tool_call.arguments,
+                        "result": tool_content,
+                    },
+                    on_step=on_step,
+                )
 
-        response = await self._call_llm(messages=messages, steps=steps, on_step=on_step, use_tools=False)
+            except ToolNotFoundError as error:
+                has_tool_error = True
+                tool_content = error.user_message()
+
+                await self._add_step(
+                    steps=steps,
+                    name="tool_error",
+                    message=tool_content,
+                    meta={
+                        "tool_call_id": tool_call.id,
+                        "tool_name": tool_call.name,
+                        "arguments": tool_call.arguments,
+                    },
+                    on_step=on_step,
+                )
+
+            messages.append(Message(role="tool", name=tool_call.name, tool_call_id=tool_call.id, content=tool_content))
+
+        response = await self._call_llm(messages=messages, steps=steps, on_step=on_step, use_tools=has_tool_error)
+
         if not response.content:
             response.content = self._build_answer_from_last_tool_result(messages)
-        
+
         return response
 
     def _build_answer_from_last_tool_result(self, messages: list[Message]) -> str:
