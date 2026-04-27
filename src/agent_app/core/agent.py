@@ -154,7 +154,7 @@ class Agent:
                     on_step=on_step,
                 )
 
-            messages.append(Message(role="tool", name=tool_call.name, tool_call_id=tool_call.id, content=tool_content))
+            messages.append(Message(role="tool", name=tool_call.name, tool_call_id=tool_call.id, content=tool_content, meta={"display": tool_result.display}))
 
         response = await self._call_llm(messages=messages, steps=steps, on_step=on_step, use_tools=has_tool_error)
 
@@ -171,7 +171,8 @@ class Agent:
 
         last = tool_messages[-1]
 
-        display = getattr(last, "meta", {}).get("display")
+        meta = getattr(last, "meta", None) or {}
+        display = meta.get("display")
 
         if display:
             return display
