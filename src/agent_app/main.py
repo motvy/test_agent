@@ -29,17 +29,9 @@ async def main() -> None:
     memory = RecentMessagesMemory(max_messages=settings.memory_size)
     tools = create_tools()
 
-    agent = Agent(
-        llm_client=llm_client,
-        memory=memory,
-        tools=tools,
-        system_prompt=settings.system_prompt,
-        temperature=settings.temperature,
-        max_tokens=settings.max_tokens,
-        max_tool_iterations=settings.max_tool_iterations,
-    )
+    agent = Agent(llm_client=llm_client, memory=memory, tools=tools, settings=settings)
 
-    cli = CLIInterface(settings=settings, agent=agent, llm_client=llm_client, memory=memory, tools=tools)
+    cli = CLIInterface(agent=agent)
 
     await cli.run()
     logger.info("Application finished")

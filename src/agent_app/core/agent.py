@@ -3,6 +3,7 @@ from typing import Any
 
 from loguru import logger
 
+from agent_app.config import AppSettings
 from agent_app.core.messages import Message
 from agent_app.core.steps import AgentResult, Step
 from agent_app.llm import BaseLLMClient, LLMResponse, LLMError, ToolNotFoundError
@@ -14,36 +15,40 @@ StepCallback = Callable[[Step], Awaitable[None]]
 
 
 class Agent:
-    def __init__(
-        self,
-        llm_client: BaseLLMClient,
-        memory: BaseMemory,
-        tools: ToolRegistry,
-        system_prompt: str,
-        temperature: float,
-        max_tokens: int | None,
-        max_tool_iterations: int,
-    ) -> None:
-        self.llm_client = llm_client
-        self.memory = memory
-        self.tools = tools
-        self.system_prompt = system_prompt
-        self.temperature = temperature
-        self.max_tokens = max_tokens
-        self.max_tool_iterations = max_tool_iterations
+    def __init__(self, llm_client: BaseLLMClient, memory: BaseMemory, tools: ToolRegistry, settings: AppSettings) -> None:
+        self._llm_client = llm_client
+        self._memory = memory
+        self._tools = tools
+        self._settings = settings
+    
+    @property
+    def llm_client(self):
+        return self._llm_client
+
+    @property
+    def memory(self):
+        return self._memory
+
+    @property
+    def tools(self):
+        return self._tools
+
+    @property
+    def settings(self):
+        return self._settings
 
     async def run(self, user_input: str, on_step: StepCallback | None = None) -> AgentResult:
         steps: list[Step] = []
 
-        await self.memory.add(Message(role="user", content=user_input))
+        await self._memory.add(Message(role="user", content=user_input))
 
         await self._add_step(steps=steps, name="user_message_received", message="Получен запрос пользователя", meta={"content": user_input}, on_step=on_step)
 
-        messages = [Message(role="system", content=self.system_prompt), *await self.memory.get_context()]
+        messages = [Message(role="system", content=self._settings.system_prompt), *await self._memory.get_context()]
 
         response = await self._call_llm(messages=messages, steps=steps, on_step=on_step, use_tools=True)
 
-        for iteration in range(self.max_tool_iterations):
+        for iteration in range(self._settings.max_tool_iterations):
             if not response.tool_calls:
                 break
 
@@ -54,18 +59,18 @@ class Agent:
                 steps=steps,
                 name="max_tool_iterations_reached",
                 message="Достигнут лимит итераций tools",
-                meta={"max_tool_iterations": self.max_tool_iterations},
+                meta={"max_tool_iterations": self._settings.max_tool_iterations},
                 on_step=on_step,
             )
 
-        await self.memory.add(Message(role="assistant", content=response.content))
+        await self._memory.add(Message(role="assistant", content=response.content))
 
         await self._add_step(steps=steps, name="assistant_answer_ready", message="Финальный ответ получен", meta={"answer": response.content}, on_step=on_step)
 
         return AgentResult(answer=response.content, reasoning=response.reasoning, steps=steps)
 
     async def _call_llm(self, messages: list[Message], steps: list[Step], on_step: StepCallback | None, use_tools: bool = True) -> LLMResponse:
-        tools = self.tools.openai_schemas() if use_tools else None
+        tools = self._tools.openai_schemas() if use_tools else None
 
         await self._add_step(
             steps=steps,
@@ -73,19 +78,19 @@ class Agent:
             message="Отправка запроса в LLM",
             meta={
                 "messages_count": len(messages),
-                "tools": self.tools.names() if use_tools else [],
-                "temperature": self.temperature,
-                "max_tokens": self.max_tokens,
+                "tools": self._tools.names() if use_tools else [],
+                "temperature": self._settings.temperature,
+                "max_tokens": self._settings.max_tokens,
             },
             on_step=on_step,
         )
 
         try:
-            response = await self.llm_client.chat(messages=messages, temperature=self.temperature, max_tokens=self.max_tokens, tools=tools)
+            response = await self._llm_client.chat(messages=messages, temperature=self._settings.temperature, max_tokens=self._settings.max_tokens, tools=tools)
         except LLMError as error:
             error_text = f"[Ошибка] {error.user_message()}"
             await self._add_step(steps=steps, name="llm_error", message=error_text, on_step=on_step)
-            await self.memory.add(Message(role="assistant", content=error_text))
+            await self._memory.add(Message(role="assistant", content=error_text))
             raise
 
         await self._add_step(
@@ -121,7 +126,7 @@ class Agent:
 
         for tool_call in response.tool_calls:
             try:
-                tool_result = self.tools.run(name=tool_call.name, arguments=tool_call.arguments)
+                tool_result = self._tools.run(name=tool_call.name, arguments=tool_call.arguments)
                 tool_content = tool_result.content
                 tool_display = tool_result.display
 

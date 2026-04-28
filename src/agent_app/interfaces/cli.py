@@ -8,23 +8,16 @@ from rich.text import Text
 from agent_app.config import AppSettings
 from agent_app.core import Agent, Step
 from agent_app.interfaces.base import BaseInterface
-from agent_app.llm import OpenAICompatibleClient, LLMError
-from agent_app.memory import BaseMemory
-from agent_app.tools import ToolRegistry
+from agent_app.llm import LLMError
 
 
 class CLIInterface(BaseInterface):
-    def __init__(self, settings: AppSettings, agent: Agent, llm_client: OpenAICompatibleClient, memory: BaseMemory, tools: ToolRegistry) -> None:
-        self.settings = settings
-        self.agent = agent
-        self.llm_client = llm_client
-        self.memory = memory
-        self.tools = tools
-
-        self.console = Console(width=100)
+    def __init__(self, agent: Agent) -> None:
+        self._agent = agent
+        self._console = Console(width=100)
 
     async def run(self) -> None:
-        if self.settings.model is None:
+        if self._agent.settings.model is None:
             self._print_header(clear=True)
 
             should_continue = await self._select_model(allow_exit=True)
@@ -56,13 +49,13 @@ class CLIInterface(BaseInterface):
                 break
 
     def _show_main_menu(self) -> None:
-        self.console.print("\n[bold]Главное меню[/bold]")
-        self.console.print("1. Чат")
-        self.console.print("2. Выбрать модель")
-        self.console.print("3. Настройки генерации")
-        self.console.print("4. Настройки отображения")
-        self.console.print("5. Показать доступные tools")
-        self.console.print("0. Выход\n")
+        self._console.print("\n[bold]Главное меню[/bold]")
+        self._console.print("1. Чат")
+        self._console.print("2. Выбрать модель")
+        self._console.print("3. Настройки генерации")
+        self._console.print("4. Настройки отображения")
+        self._console.print("5. Показать доступные tools")
+        self._console.print("0. Выход\n")
 
     async def _chat_loop(self) -> None:
         last_result = None
@@ -72,16 +65,16 @@ class CLIInterface(BaseInterface):
             self._print_header(clear=True)
             await self._show_memory()
 
-            if live_steps and self.settings.show_steps:
-                self.console.print("\n[bold]Steps последнего ответа:[/bold]")
+            if live_steps and self._agent.settings.show_steps:
+                self._console.print("\n[bold]Steps последнего ответа:[/bold]")
                 for step in live_steps:
                     self._print_step(step)
 
-            if last_result is not None and self.settings.show_reasoning and last_result.reasoning:
-                self.console.print("\n[bold]Reasoning последнего ответа:[/bold]")
-                self.console.print(last_result.reasoning)
+            if last_result is not None and self._agent.settings.show_reasoning and last_result.reasoning:
+                self._console.print("\n[bold]Reasoning последнего ответа:[/bold]")
+                self._console.print(last_result.reasoning)
 
-            self.console.print("\n[bold]Введите сообщение или /q для выхода в меню[/bold]")
+            self._console.print("\n[bold]Введите сообщение или /q для выхода в меню[/bold]")
             user_input = input("Вы: ").strip()
 
             if user_input.lower() in {"/exit", "/quit", "/q"}:
@@ -97,32 +90,32 @@ class CLIInterface(BaseInterface):
             self._print_user_message(user_input)
             self._print_agent_message("[Думает...]")
 
-            self.console.print("\n[bold]Steps последнего ответа:[/bold]")
+            self._console.print("\n[bold]Steps последнего ответа:[/bold]")
 
             async def on_step(step: Step) -> None:
                 live_steps.append(step)
 
-                if self.settings.show_steps:
+                if self._agent.settings.show_steps:
                     self._print_step(step)
 
             try:
-                last_result = await self.agent.run(user_input=user_input, on_step=on_step)
+                last_result = await self._agent.run(user_input=user_input, on_step=on_step)
             except LLMError:
                 last_result = None
 
     async def _select_model(self, allow_exit: bool = False) -> bool:
-        self.console.print("Загрузка моделей...\n")
+        self._console.print("Загрузка моделей...\n")
 
-        models = await self.llm_client.list_models()
+        models = await self._agent.llm_client.list_models()
 
         if not models:
-            self.console.print("[red]Модели не найдены[/red]")
+            self._console.print("[red]Модели не найдены[/red]")
             return not allow_exit
 
         for index, model in enumerate(models, start=1):
-            self.console.print(f"{index}. {model}")
+            self._console.print(f"{index}. {model}")
 
-        self.console.print("0. Выход" if allow_exit else "0. Назад")
+        self._console.print("0. Выход" if allow_exit else "0. Назад")
 
         choice = input("\nВыберите модель: ").strip()
 
@@ -133,24 +126,24 @@ class CLIInterface(BaseInterface):
             selected_index = int(choice) - 1
             selected_model = models[selected_index]
         except (ValueError, IndexError):
-            self.console.print("[red]Неверный выбор[/red]")
+            self._console.print("[red]Неверный выбор[/red]")
             return True
 
-        self.settings.model = selected_model
-        self.llm_client.model = selected_model
-        await self.memory.clear()
+        self._agent.settings.model = selected_model
+        self._agent.llm_client.model = selected_model
+        await self._agent.memory.clear()
 
-        self.console.print(f"\n[green]Выбрана модель:[/green] {selected_model}")
+        self._console.print(f"\n[green]Выбрана модель:[/green] {selected_model}")
         return True
 
     def _generation_settings_menu(self) -> None:
         while True:
             self._print_header(clear=True)
 
-            self.console.print("[bold]Настройки генерации[/bold]\n")
-            self.console.print(f"1. Temperature: {self.settings.temperature}")
-            self.console.print(f"2. Max tokens: {self.settings.max_tokens}")
-            self.console.print("0. Назад\n")
+            self._console.print("[bold]Настройки генерации[/bold]\n")
+            self._console.print(f"1. Temperature: {self._agent.settings.temperature}")
+            self._console.print(f"2. Max tokens: {self._agent.settings.max_tokens}")
+            self._console.print("0. Назад\n")
 
             choice = input("Выбор: ").strip()
 
@@ -165,56 +158,56 @@ class CLIInterface(BaseInterface):
         value = input("Введите temperature или пусто для None: ").strip()
 
         if not value:
-            self.settings.temperature = None
-            self.agent.temperature = None
+            self._agent.settings.temperature = None
+            self._agent.temperature = None
             return
 
         try:
-            self.settings.temperature = float(value)
-            self.agent.temperature = self.settings.temperature
+            self._agent.settings.temperature = float(value)
+            self._agent.temperature = self._agent.settings.temperature
         except ValueError:
-            self.console.print("[red]Неверное значение[/red]")
+            self._console.print("[red]Неверное значение[/red]")
 
     def _change_max_tokens(self) -> None:
         value = input("Введите max_tokens или пусто для None: ").strip()
 
         if not value:
-            self.settings.max_tokens = None
-            self.agent.max_tokens = None
+            self._agent.settings.max_tokens = None
+            self._agent.max_tokens = None
             return
 
         try:
-            self.settings.max_tokens = int(value)
-            self.agent.max_tokens = self.settings.max_tokens
+            self._agent.settings.max_tokens = int(value)
+            self._agent.max_tokens = self._agent.settings.max_tokens
         except ValueError:
-            self.console.print("[red]Неверное значение[/red]")
+            self._console.print("[red]Неверное значение[/red]")
 
     def _display_settings_menu(self) -> None:
         while True:
             self._print_header(clear=True)
 
-            self.console.print("[bold]Настройки отображения[/bold]\n")
-            self.console.print(f"1. Показывать steps: {self.settings.show_steps}")
-            self.console.print(f"2. Показывать reasoning: {self.settings.show_reasoning}")
-            self.console.print("0. Назад\n")
+            self._console.print("[bold]Настройки отображения[/bold]\n")
+            self._console.print(f"1. Показывать steps: {self._agent.settings.show_steps}")
+            self._console.print(f"2. Показывать reasoning: {self._agent.settings.show_reasoning}")
+            self._console.print("0. Назад\n")
 
             choice = input("Выбор: ").strip()
 
             if choice == "1":
-                self.settings.show_steps = not self.settings.show_steps
+                self._agent.settings.show_steps = not self._agent.settings.show_steps
             elif choice == "2":
-                self.settings.show_reasoning = not self.settings.show_reasoning
+                self._agent.settings.show_reasoning = not self._agent.settings.show_reasoning
             elif choice == "0":
                 return
 
     async def _show_memory(self, show_empty_message: bool = True) -> None:
-        messages = await self.memory.get_context()
+        messages = await self._agent.memory.get_context()
 
-        self.console.print("\n[bold]История диалога:[/bold]")
+        self._console.print("\n[bold]История диалога:[/bold]")
 
         if not messages:
             if show_empty_message:
-                self.console.print("[dim]Пока пусто[/dim]")
+                self._console.print("[dim]Пока пусто[/dim]")
 
             return
 
@@ -225,10 +218,10 @@ class CLIInterface(BaseInterface):
                 self._print_agent_message(message.content)
 
     def _show_tools(self) -> None:
-        self.console.print("[bold]Доступные tools:[/bold]\n")
+        self._console.print("[bold]Доступные tools:[/bold]\n")
 
-        for name in self.tools.names():
-            self.console.print(f"- {name}")
+        for name in self._agent.tools.names():
+            self._console.print(f"- {name}")
 
     def _print_header(self, clear: bool = False) -> None:
         if clear:
@@ -239,23 +232,23 @@ class CLIInterface(BaseInterface):
         table.add_column(justify="center")
         table.add_column(justify="right")
 
-        model = self.settings.model or "не выбрана"
+        model = self._agent.settings.model or "не выбрана"
 
         left = Text()
         left.append("LLM Agent CLI\n", style="bold cyan")
         left.append(f"Модель: {model}", style="white")
 
         center = Text()
-        center.append(f"Temp: {self.settings.temperature}\n")
-        center.append(f"Tokens: {self.settings.max_tokens}")
+        center.append(f"Temp: {self._agent.settings.temperature}\n")
+        center.append(f"Tokens: {self._agent.settings.max_tokens}")
 
         right = Text()
-        right.append(f"Steps: {self.settings.show_steps}\n", style="green" if self.settings.show_steps else "red")
-        right.append(f"Reasoning: {self.settings.show_reasoning}", style="green" if self.settings.show_reasoning else "red")
+        right.append(f"Steps: {self._agent.settings.show_steps}\n", style="green" if self._agent.settings.show_steps else "red")
+        right.append(f"Reasoning: {self._agent.settings.show_reasoning}", style="green" if self._agent.settings.show_reasoning else "red")
 
         table.add_row(left, center, right)
 
-        self.console.print(
+        self._console.print(
             Panel(
                 table,
                 border_style="cyan",
@@ -263,7 +256,7 @@ class CLIInterface(BaseInterface):
         )
 
     def _print_user_message(self, text: str) -> None:
-        self.console.print(
+        self._console.print(
             Panel(
                 Text(text),
                 title="Вы",
@@ -273,7 +266,7 @@ class CLIInterface(BaseInterface):
         )
 
     def _print_agent_message(self, text: str) -> None:
-        self.console.print(
+        self._console.print(
             Panel(
                 Text(text),
                 title="Агент",
@@ -298,7 +291,7 @@ class CLIInterface(BaseInterface):
 
             text += "\n[dim]" + "\n".join(meta_lines) + "[/dim]"
 
-        self.console.print(
+        self._console.print(
             Panel(
                 Text.from_markup(text),
                 title=step.name,

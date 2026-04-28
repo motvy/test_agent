@@ -6,7 +6,6 @@ from agent_app.memory.base import BaseMemory
 
 class RecentMessagesMemory(BaseMemory):
     def __init__(self, max_messages: int):
-        self.max_messages = max_messages
         self._messages = deque(maxlen=max_messages)
 
     async def add(self, message: Message) -> None:
