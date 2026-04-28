@@ -20,7 +20,7 @@ class OpenAICompatibleClient(BaseLLMClient):
         api_key: str | None = None,
         api_key_header: str = "Authorization",
         timeout: float = 120.0,
-    ):
+    ) -> None:
         self._base_url = base_url.rstrip("/")
         self._model = model
         self._api_key = api_key
@@ -28,7 +28,7 @@ class OpenAICompatibleClient(BaseLLMClient):
         self._timeout = httpx.Timeout(timeout, connect=10.0, read=timeout, write=10.0, pool=10.0)
 
     @property
-    def model(self):
+    def model(self) -> str | None:
         return self._model
 
     @model.setter

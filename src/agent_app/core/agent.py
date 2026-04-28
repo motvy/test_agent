@@ -22,19 +22,19 @@ class Agent:
         self._settings = settings
     
     @property
-    def llm_client(self):
+    def llm_client(self) -> BaseLLMClient:
         return self._llm_client
 
     @property
-    def memory(self):
+    def memory(self) -> BaseMemory:
         return self._memory
 
     @property
-    def tools(self):
+    def tools(self) -> ToolRegistry:
         return self._tools
 
     @property
-    def settings(self):
+    def settings(self) -> AppSettings:
         return self._settings
 
     async def run(self, user_input: str, on_step: StepCallback | None = None) -> AgentResult:
