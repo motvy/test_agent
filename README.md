@@ -23,6 +23,8 @@
 
 ## Архитектура
 
+![Architecture](docs/architecture.drawio.png)
+
 ```text
 src/agent_app/
   core/                       # ядро агента
